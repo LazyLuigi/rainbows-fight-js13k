@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rainbow Fight // music lab</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#050509;color:#ddd;font:14px monospace;display:grid;place-items:center;min-height:100vh}main{width:min(960px,100%);padding:12px}h1{font-size:16px;margin:0 0 8px;color:#0ff;text-shadow:2px 2px #a0f}canvas{width:100%;aspect-ratio:16/9;background:#000;image-rendering:pixelated;border:4px solid #292a31;box-shadow:0 0 0 2px #08080b,0 0 28px #7020a855}.bar{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}button{font:inherit;color:#fff;background:#151522;border:2px solid #444;padding:8px 10px;cursor:pointer}button.on{border-color:#0ff;color:#0ff}button.off{opacity:.4}#play{border-color:#f0a}#info{margin-top:8px;color:#9aa}#diag{margin-top:6px;color:#7a7;font-size:12px;white-space:pre-wrap}small{opacity:.75}@media(max-width:550px){button{flex:1;padding:10px 4px}}
+</style>
+</head>
+<body>
+<main>
+<h1>RAINBOW FIGHT // 8-BIT COMBAT MUSIC LAB</h1>
+<canvas id="c" width="320" height="180"></canvas>
+<div class="bar">
+<button id="play">PLAY [SPACE]</button>
+<button id="m0">BASS [1]</button><button id="m1">LEAD [2]</button>
+<button id="m2">ARP [3]</button><button id="m3">DRUMS [4]</button>
+<button id="bpmdn">BPM -</button><button id="bpmup">BPM +</button>
+</div>
+<div id="info">Left/Right or A/D or tap the canvas: hit on the beat &middot; <span id="s">loading</span></div>
+<div id="diag">boot...</div>
+<small>Music: 4 NES-style voices scheduled ahead on the AudioContext clock. Patterns are 16-char strings, 1 char = 1 sixteenth. No samples.</small>
+</main>
+<script>
+"use strict";
+// ---------------------------------------------------------------------
+// Diagnostics. Sandboxed previews report cross-origin failures as a bare
+// "Script error." with no line info, so this lab reports its own state:
+// every entry point is wrapped and anything thrown is printed below.
+// ---------------------------------------------------------------------
+var DIAG=document.getElementById('diag'), diagLines=[], frames=0, audioState='no context yet';
+function say(m){diagLines.push(m);if(diagLines.length>6)diagLines.shift()}
+function guard(name,fn){return function(){try{return fn.apply(this,arguments)}catch(e){say('X '+name+': '+(e&&e.message||e))}}}
+window.addEventListener('error',function(e){
+  say(e.lineno?('X '+e.message+' @'+e.lineno+':'+e.colno):'! external script error, masked by the sandbox, not from this lab');
+});
+
+var $=function(k){return document.getElementById(k)};
+var cv=$('c'), C=cv.getContext('2d'), st=$('s');
+
+// =====================================================================
+// MUSIC ENGINE
+// Note chars: '0'-'9' = semitones 0-9, 'a'-'z' = 10-35 above the voice
+// base note. '.' = rest, '-' = hold the previous note one more step.
+// Drums: 'x' kick, 'o' snare, '-' hat, '.' nothing.
+// =====================================================================
+var BPM=158, STEP=60/158/4;
+var AC=null, master, gains=[], mute=[0,0,0,0], noiseBuf=null;
+var nextT=0, step=0, timer=0, playing=0, startT=0;
+
+// E minor, Double Dragon flavour: Em / Em / C / D
+var BASS=["0.0.0-3.0.0-a.7.","0.0.0-3.0.0-a.c.","8.8.8-c.8.8-f.c.","a.a.a-e.a.a-h.e."];
+var LEAD=["c-..a-c-f-c-a-7-","5-..7-a-7-5-3-0-","c---f-c-a---7-5-","7-a-e---c-------"];
+var CHORD=[[0,3,7],[0,3,7],[8,12,15],[10,14,17]];
+var DRUM="x.-.o.-.x.x-o.-o";
+var BASE=[82.41,329.63,164.81];   // E2 bass, E4 lead, E3 arp
+
+function ensureAudio(){
+  if(AC){if(AC.state==='suspended'){var p=AC.resume();if(p&&p['catch'])p['catch'](function(){})}return AC}
+  var Ctor=window.AudioContext||window.webkitAudioContext;
+  if(!Ctor){audioState='AudioContext unavailable in this frame';return null}
+  try{AC=new Ctor()}catch(e){audioState='AudioContext blocked: '+e.message;return null}
+  try{
+    master=AC.createGain();master.gain.value=.5;master.connect(AC.destination);
+    for(var i=0;i<4;i++){gains[i]=AC.createGain();gains[i].gain.value=mute[i]?0:1;gains[i].connect(master)}
+    var len=Math.floor(AC.sampleRate*.3);
+    noiseBuf=AC.createBuffer(1,len,AC.sampleRate);
+    var d=noiseBuf.getChannelData(0);
+    for(var j=0;j<len;j++)d[j]=Math.random()*2-1;
+  }catch(e){audioState='audio graph failed: '+e.message;AC=null;return null}
+  if(AC.state==='suspended'){var pr=AC.resume();if(pr&&pr['catch'])pr['catch'](function(){})}
+  audioState='ready '+AC.sampleRate+' Hz';
+  return AC;
+}
+function noteOf(ch){return ch>='a'?ch.charCodeAt(0)-87:ch.charCodeAt(0)-48}
+function holdLen(pat,i){var n=1;while(n<16&&pat.charAt((i+n)%16)==='-')n++;return n}
+
+function tone(chan,freq,t,dur,type,vol,det){
+  if(!AC)return;
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.type=type;o.frequency.value=freq;if(det)o.detune.value=det;
+  o.connect(g);g.connect(gains[chan]);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.008);
+  g.gain.setValueAtTime(vol,t+dur*.6);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.start(t);o.stop(t+dur+.02);
+}
+function noiseHit(t,dur,vol,hp){
+  if(!AC||!noiseBuf)return;
+  var s=AC.createBufferSource(),g=AC.createGain(),f=AC.createBiquadFilter();
+  s.buffer=noiseBuf;f.type=hp?'highpass':'bandpass';f.frequency.value=hp?7000:1800;f.Q.value=.8;
+  s.connect(f);f.connect(g);g.connect(gains[3]);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  s.start(t);s.stop(t+dur+.02);
+}
+function kick(t){
+  if(!AC)return;
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(40,t+.11);
+  o.connect(g);g.connect(gains[3]);
+  g.gain.setValueAtTime(.9,t);g.gain.exponentialRampToValueAtTime(.0001,t+.14);
+  o.start(t);o.stop(t+.16);
+}
+function playStep(i,t){
+  var bar=(i>>4)%4, b=i&15, ch, n, d, f;
+  ch=BASS[bar].charAt(b);
+  if(ch!=='.'&&ch!=='-'){n=noteOf(ch);d=holdLen(BASS[bar],b)*STEP;
+    tone(0,BASE[0]*Math.pow(2,n/12),t,d*.95,'triangle',.55);
+    tone(0,BASE[0]*2*Math.pow(2,n/12),t,d*.4,'square',.06)}
+  ch=LEAD[bar].charAt(b);
+  if(ch!=='.'&&ch!=='-'){n=noteOf(ch);d=holdLen(LEAD[bar],b)*STEP;f=BASE[1]*Math.pow(2,n/12);
+    tone(1,f,t,d*.9,'square',.11,-6);tone(1,f,t,d*.9,'square',.11,6)}
+  var c=CHORD[bar];
+  tone(2,BASE[2]*Math.pow(2,c[b%3]/12),t,STEP*.9,'square',.05);
+  ch=DRUM.charAt(b);
+  if(ch==='x')kick(t);
+  if(ch==='o'){noiseHit(t,.12,.5);kick(t)}
+  if(ch==='-')noiseHit(t,.03,.18,1);
+  if(b%2===0&&ch!=='-')noiseHit(t,.02,.08,1);
+}
+var tick=guard('tick',function(){
+  if(!playing||!AC)return;
+  var ahead=AC.currentTime+.2, n=0;
+  while(nextT<ahead&&n<64){playStep(step,nextT);nextT+=STEP;step++;n++}
+});
+function start(){
+  if(!ensureAudio()){say('! no audio: '+audioState);ui();return}
+  STEP=60/BPM/4;playing=1;step=0;startT=nextT=AC.currentTime+.1;hits=[];
+  clearInterval(timer);timer=setInterval(tick,40);ui();
+}
+function stop(){playing=0;clearInterval(timer);ui()}
+function setBpm(v){BPM=Math.max(90,Math.min(220,v));STEP=60/BPM/4;if(playing)start();ui()}
+function toggleMute(i){mute[i]^=1;if(AC&&gains[i])gains[i].gain.setTargetAtTime(mute[i]?0:1,AC.currentTime,.02);ui()}
+
+// =====================================================================
+// RHYTHM TEST: distance from the nearest quarter-note beat, in ms
+// =====================================================================
+var hits=[], flash=0, combo=0;
+function beatSec(){return STEP*4}
+function hit(dir){
+  if(!playing){start();return}
+  var now=AC.currentTime, el=now-startT, bt=beatSec();
+  var off=el/bt-Math.round(el/bt), ms=off*bt*1000, a=Math.abs(ms);
+  var q=a<50?'PERFECT':a<110?'GOOD':'MISS';
+  combo=(q==='MISS')?0:combo+1;
+  hits.push({t:now,ms:ms,q:q,dir:dir});if(hits.length>6)hits.shift();
+  flash=1;
+  tone(1,q==='PERFECT'?520:q==='GOOD'?380:140,now,.09,'square',.2);
+  noiseHit(now,.05,.3);
+}
+
+// =====================================================================
+// UI
+// =====================================================================
+function ui(){
+  var b=$('play');b.className=playing?'on':'';b.textContent=(playing?'STOP':'PLAY')+' [SPACE]';
+  for(var i=0;i<4;i++)$('m'+i).className=mute[i]?'off':'on';
+  $('bpmup').textContent='BPM '+BPM+' +';
+}
+$('play').onclick=guard('play',function(){playing?stop():start()});
+for(var mi=0;mi<4;mi++)(function(i){$('m'+i).onclick=guard('mute',function(){ensureAudio();toggleMute(i)})})(mi);
+$('bpmdn').onclick=guard('bpm-',function(){setBpm(BPM-4)});
+$('bpmup').onclick=guard('bpm+',function(){setBpm(BPM+4)});
+document.addEventListener('keydown',guard('key',function(e){
+  var k=(e.key||'').toLowerCase();
+  if(k===' '){e.preventDefault();playing?stop():start();return}
+  if(k.length===1&&'1234'.indexOf(k)>-1){ensureAudio();toggleMute(+k-1);return}
+  if(k==='arrowleft'||k==='a'){e.preventDefault();hit(-1);return}
+  if(k==='arrowright'||k==='d'){e.preventDefault();hit(1);return}
+  if(k==='-')setBpm(BPM-4);
+  if(k==='+'||k==='=')setBpm(BPM+4);
+}));
+cv.addEventListener('pointerdown',guard('tap',function(e){
+  var r=cv.getBoundingClientRect();hit((e.clientX-r.left)<r.width/2?-1:1);
+}));
+
+// =====================================================================
+// DRAW
+// =====================================================================
+var PAL=['#37d746','#f023aa','#ffda23','#14bedc'];
+var NAMES=['BASS','LEAD','ARP','DRUM'];
+var draw=guard('draw',function(){
+  frames++;
+  var el=(playing&&AC)?AC.currentTime-startT:0;
+  var cur=playing?Math.floor(el/STEP):0, bar=(cur>>4)%4, b=cur&15;
+  var beatPh=playing?(el/beatSec())%1:0;
+  if(!(beatPh>=0))beatPh=0;
+  C.fillStyle='#03030a';C.fillRect(0,0,320,180);
+  C.fillStyle='#071018';C.fillRect(0,0,320,25);
+  C.font='8px monospace';
+  C.fillStyle='#f0e93b';C.fillText('BPM '+BPM,7,10);
+  C.fillStyle='#0ff';C.fillText('BAR '+(bar+1)+'/4  STEP '+(b+1),110,10);
+  C.fillStyle='#f45';C.fillText('COMBO '+combo,250,10);
+  C.fillStyle='#9aa';C.fillText(playing?'PLAYING':'PRESS PLAY',7,21);
+
+  var pr=14+(1-beatPh)*10;
+  C.strokeStyle=flash>0?'#fff':'#e12bbd';C.lineWidth=3;
+  C.beginPath();C.arc(160,52,pr,0,6.283);C.stroke();
+  flash*=.85;if(flash<.05)flash=0;
+
+  var last=hits.length?hits[hits.length-1]:null;
+  if(last&&AC&&AC.currentTime-last.t<1.2){
+    C.fillStyle=last.q==='PERFECT'?'#ffda23':(last.q==='GOOD'?'#37d746':'#ee2323');
+    C.fillText((last.dir<0?'<< ':'>> ')+last.q+' '+(last.ms>0?'+':'')+Math.round(last.ms)+'ms',112,78);
+  }
+
+  var pats=[BASS[bar],LEAD[bar],'aaaaaaaaaaaaaaaa',DRUM];
+  for(var r=0;r<4;r++){
+    var y=92+r*20;
+    C.fillStyle=mute[r]?'#444':PAL[r];C.fillText(NAMES[r],5,y+10);
+    for(var i2=0;i2<16;i2++){
+      var ch=pats[r].charAt(i2), on=(ch!=='.'&&ch!=='-'), x=42+i2*17;
+      C.fillStyle=(i2===b&&playing)?'#ffffff':(i2%4===0?'#1c1c32':'#101020');
+      C.fillRect(x,y,15,15);
+      if(on||(r===3&&ch==='-')){
+        C.fillStyle=mute[r]?'#555':PAL[r];
+        var h=(r===3)?(ch==='x'?13:(ch==='o'?9:4)):13;
+        C.fillRect(x+2,y+14-h,11,h);
+      }
+    }
+  }
+  C.globalAlpha=.08;C.fillStyle='#fff';
+  for(var yy=0;yy<180;yy+=2)C.fillRect(0,yy,320,1);
+  C.globalAlpha=1;
+
+  st.textContent=playing?('playing '+(last?last.q:'')):'press SPACE or tap to start';
+  if(frames%15===0)DIAG.textContent='engine OK, frames '+frames+', audio: '+audioState+(diagLines.length?'\n'+diagLines.join('\n'):'');
+  requestAnimationFrame(draw);
+});
+ui();requestAnimationFrame(draw);
+</script>
+</body>
+</html>

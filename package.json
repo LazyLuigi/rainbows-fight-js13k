@@ -1,0 +1,26 @@
+{
+  "name": "rainbow-fight",
+  "version": "1.0.0",
+  "description": "Rainbow Fight, a js13kGames beat-em-up: a unicorn cleans the city of wolves and trash.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node tools/build.mjs --best=3",
+    "build:max": "node tools/build.mjs --O2 --best=6",
+    "build:fast": "node tools/build.mjs --no-rr",
+    "check": "node tools/check.mjs",
+    "start": "node tools/serve.mjs src",
+    "preview": "node tools/serve.mjs dist/js13k",
+    "preview:wavedash": "node tools/serve.mjs dist/wavedash",
+    "clean": "node -e \"const f=require('fs');['dist','.build','rainbow-fight.zip'].forEach(p=>f.rmSync(p,{recursive:true,force:true}))\"",
+    "autoplay": "node tools/autoplay.mjs"
+  },
+  "devDependencies": {
+    "roadroller": "^2.1.0",
+    "terser": "^5.31.0",
+    "jsdom": "^24.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

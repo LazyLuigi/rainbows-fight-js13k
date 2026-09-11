@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.zip
+.build/
+.js13k-check/
+.gen-img/
+.DS_Store
+*.log

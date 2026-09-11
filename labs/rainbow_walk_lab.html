@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rainbow Fight // walk cycle lab</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#050509;color:#ddd;font:14px monospace;display:grid;place-items:center;min-height:100vh}main{width:min(960px,100%);padding:12px}h1{font-size:16px;margin:0 0 8px;color:#0ff;text-shadow:2px 2px #a0f}canvas{width:100%;aspect-ratio:16/10;background:#000;image-rendering:pixelated;border:4px solid #292a31;box-shadow:0 0 0 2px #08080b,0 0 28px #7020a855}.bar{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}button{font:inherit;color:#fff;background:#151522;border:2px solid #444;padding:8px 10px;cursor:pointer}button.on{border-color:#0ff;color:#0ff}#info{margin-top:8px;color:#9aa}pre{font-size:11px;color:#7a7;white-space:pre-wrap;word-break:break-all;background:#0a0a14;padding:8px;border:1px solid #222}small{opacity:.75}@media(max-width:550px){button{flex:1;padding:10px 4px}}
+</style>
+</head>
+<body>
+<main>
+<h1>RAINBOW FIGHT // WALK CYCLE LAB : PASSING FRAME</h1>
+<canvas id="c" width="320" height="200"></canvas>
+<div class="bar">
+<button id="v1">1 CLOSE</button><button id="v2">2 FLAT</button><button id="v3">3 STACK</button>
+<button id="mode">FRAMES [F]</button><button id="spd">SPEED [S]</button><button id="pz">PAUSE [SPACE]</button>
+</div>
+<div id="info"></div>
+<pre id="out"></pre>
+<small>The passing frame is derived at runtime from walk frame A: everything below the hip is pinched toward the centre with a taper (0 px at the hip, full shift at the feet). CLOSE and STACK also lift the torso by one pixel and lengthen the legs by one row, since straight legs are taller than a stride.</small>
+</main>
+<script>
+"use strict";
+var cv=document.getElementById('c'),C=cv.getContext('2d');C.imageSmoothingEnabled=false;
+var
+P=['#0000','#0a0a12','#f5f5f5','#b9c3d2','#f023aa','#ffda23','#ee2323','#ff7814','#37d746','#14bedc','#285fe1','#9b19cd','#73462d','#aa734b','#14375f','#1e7dd2'],D=["Dw8PABcPAhXBEcERDwARwGDCYMPQwBAPEcBkwDDQwNDBEA4RwGFwUdAgsNFQwRANEcBhcFGA0DBAwFDQwGARDBDAYlCB4CEwUcFgwBALEWJRgOAwIjBRYcAQCxDAYHBRgODQITDAMdBwYRAKEcDQUYCg4CIw0BAwwWDAEAkR4IPwoOAjMSAwwREJEOCC4KGxMCUwwOAQChDhsKGy4DIhMsASCRDhsECx0CHQMNDA0OHC4BAJEmGwMdDAQLDQMCAw4LBB4BAJEmHAIDBD0CHRwEHgEAgRY9AgMECwQLAwIDKxwOAQCBDAYXFg0PDC0DHBMPDA4BEIEGFwUmDB0FDQUNHC4BEJEGBwUIHggMAx0MDQwDHQ4BEKEMBQgaHgMCcw0OAQCRFRgPCgsMAj8TAiMMARCBDAUYCgsTAi8KHAMCLQ4BAIEOCBobDQIvGi4DAh8MAQCBHgoLHgMSAwoOEQ4MAwITDAEAkQ4bHAcMDQ4RPg0DDRwBEIEuDB0MIRARDgwNHB4BEJEMCwQdDgEQIQ4LBA0UCw4BAJEOCywOAQAxDAscGx4BAJEMDSwOAQAxDgNeAQCRcDGQM=","Dw8PABIAFA8CFMASwhAPARHDYMPQEQ8AEWTAMMHQwRAPEcBhcFDQMEDSwRANEsBhcFCA0DBAwFBwwREMEMBicFCA4DAgMNBQwxAMEGFwUYDgMCIw0FBwYMAQCxHA0FGB4CEwwDHQUGDAEAoR4IFQgaAwIjAQMNDCEAoQ4IPgoOAjMNAgMNDAEQoQ4KWwMCUx4BALEOFAsKCx4DIhMsERChHAsEGwM9DgwNDgQbDgEAsRwLDQIDGw0DBQMeDAQRELEcExwEIwITHAseAQCRJhwCAwsELQIDDQIcDhEAkQwGLRMMGwwDHBMeASCBFlwdJQ0HAQweAQCRFhcFJx0DDB0MDRwOARCRDAYVCD4DAmMNDgEAkQwHFQgKGw0CIw0DAi0OAQCRDA0FCA4KCxMCLg0PAwITDgEQgQwFCBoLHQIvCh8NAwIeEQCBDg8aCxwDAhMOEQ4MAwIdDgEAgR4KCywFDQMOAT4DHQwREIEeCgsMHQweAQARDgwNBA0MERCBLAQsERARDgwEHQsMDgEAoQ4LLBEAIQ4MCw0MCxEQoQwDLQ4BACEdA04BAKFwMYAw==","Dw8PBRMPAxjBEQ8BEcBgwWDC0MDgEA8AEWTRwVDAEQ4SYnBQ0DHA0cAQDhHAYlGAMEDQwFDAYBEMEWNRgOAh0FDRwGARCxDAYlGA4DAi0FFhwBALEMBgcFGA4DAh0SDQUHBgwBAKEcDQUYDhIjDBMMIRCRHghKDgI9AwINDBEAoQ4IDg8IDwoLEwJTDAEQoQ4KCxobHg0DEhMsATCBHhsEGwMCLC0MTgEAkSwLDQMCRQMcGwQeAQCBLC0CAw0PAiMrDAQREHEcBhwNBw0MDQI/AwIMCxwOAQBhFiwEHC1BDQMcDhEQYQwGBwUMBBsMHQUNBRwNDB4BIGEcBgUIHCcMAgMdMTCBDA0HBQgOCh4IDgMCQw0BEJEMBRgaCx4TMj0OAQCRDhgOChsdAwIDHg8DAhMMAQCRHgobLAMCEw4sAiwBEJEeCywHDQMeDA4cAwIDDBEggR4MCwQLBwweAS4NJwweARCBHRQNDB4BEAEODAUEDBseAQCRDAMEGwwBEBEcFBsECw4BAJEODA0LHAEAMQ4MCw0+AQCRHA0DHAEAMQ4MAw0MDgEgoWAxcE","Dw8PBhMPAxjBEQ8AEsBixNDAEA8RwGTA0MHQwRAOEWNwUNAxwNBQwOAQDRFjUYDQMEDAUMIQDRBjUYDgIdBQ0MIQDRBiUYDgMCLQUWERCxHAcFGA4PAhMSDQUHBgwBAKEcDQUYDhMCEwwTDCEQoQ4ISg4CPQMCDQwBELEIDg8IDwoLEwJTDAEAwQoLGhseDQMCIywBELEOCwQLLgMCHA0MDQ4MHgEQoRwLBAsNAwI9HCseAQBxXB0CAwIDAhMMKwQcAQBhHGMiAxITHAQsAQBhDAZcHg0sAwItBAwLDgEAURwGBwUXBhwdBS0DLgweARBRDAYHBRgVBwYNAx0jDgwRMFEWFRgPCg8IEwIjAiMNARBxDA0VCA8KCw4iIw8CPQ4BAHEMBQ0FCAoLHgwDAi8OAxITDAEQYQ4YGhsdAjMOCg8SLQ4BAGEeChscEwITDx4BDhMCEw4BEGEeCgsMCwcNAx4PDgEuAwIDDB4BAHEeDQsECwcMDgEwAQ4MDRcMDgEQcR0UDQwREDEODA0EDA0MERBxDgMEGw4BAEEeBAsNBC4BAHEdAwsNARBRHQENMRCBUHFwI=","Dw8PDw8PBxkPBBHDEeDAEQ8BEsBiwODB0MAQDwEQwGTQMMDQwBEPABFiUdAxwNDBEA8RYXBQgTHQUMFgEA8QYXBQgTAgMCDQUGEQDhHAcFCB8CHRMNHAEQsSwVCB4DAhMMDRwGDAEgkQ4YOg4CUw0MLgEAIVABDhofChsDEi0DDgsEHAFMMQABDis8Ax8MDSwLFAxkHQEAATsjAiUSAwIDCwwtEw0kGwEAMQ4MAw0MCwMCLQwOHAMCPQQNCwQLAQAxDAMbBBsCEwwNEmwEDC0BADEMAgMLFAwDHQUNAkMfDhwOIQAxDA0PDE0FDAMCEw8OMWAxHA0GLC0CEw8OCg4BMJEWJwYXDgIvCh4BEMEGFwUIBQgfAhMOESDRBhUIHwoLDQITDgEQ8QwHBQgKGxMCHw4BAPABDAcFCAoLHAITDgEQ8AEMDQgPCgscAy4BAPARDAgPCgscFwweAQDwER47DB0EDA4BAPAhPgwEGw0MDgEA8FEODAsdEQ4BAPBRkO","Dw8KEgQUDwERwBECEcIRDwAQ4MEUwFLAEAwUwFDAYsAQ0FLAEAoSwGDCUMFhwBBTwBEIEcBhwNDBUNBwYsBUwBEHEMBi0DBAwdBRcNBgwVLQwBAHEGJw0DCwMCEw0MDQwNAQwFLAEAYRYXBQgMAiMNAzwRBSwBAGEGJRgMAiMNAh0DDDYcAQBRHAYHBQgdAiMCEx4MDg0WDAEQUQwGFRgKDwJTDgxLDBEQQQwGFQgaEwITDRwDNAsEHA4BAEEMBgcFCA8KCx0TAgMNEysMBBwOAQBBDgwVCAobHAMCAwwLBA0PDgwODAsMARBBLAgaCwQLDAIdFBsNDB4hEGEOCB8KCywCEwQMCw0FDEEQYR4PCgsmDA0cHTMCEw0OARBhHhZNHB0TAkMNDgEAcSZsEwITIiMMARCBBicFBy4DAhMOHwIsDgEgYQYXBQguHAItHAIDDA0MHgEAYQYVCB8KHhMCHA4MDw0sIQBhDAcFCA8KCywDAh4BDgwFBAwEGwEAYQwNBQgKCwQLDAMCEwwBHBQbDQMBAGEMCB4KCxwjAg4RLAQLAw0MAQBhDhobLB0cERABDA0cASBhHgoLPAQMDQwRABEuARCRLj0kHAEAMSDBTQMNCxwBAPBxcK","Dw8JEg8MEOAUDwcRwRDBEA8GEcUSDwMRwdDC4MERDwERyOERDxHgx+MSDRDB0sDQwNHiwNDAEQwQ4MDQwRDA0cDi0sAQDBHQEMLQwuHA0sARDBLB0MHQwOHA0cIRCRPC4cDQwOLB0sAQCBHCEMDi0cDk0MDQwBAIEMDRw+HC4MHgEODRwBAIEMYQ4BDA0MTgwNDAEAgQ4MDhweAQ4BHA4MDRweDA4BAIEuHBEeTA0cDgEwoW4PLhwBDgEOARDhHg8uHw5MERDBHg8+Py4cEQDBDh8eIR4PMRwBAMEMDQ8OEU8+ASDBDh8OEQAhDh0OIRDBDg8eEQAhHg0OMQDBDg8ODA4BADEeHx4BELEcDQwRAEEeHwwREIEuDB0MAQBRDgEMMQBxHD0MEQBRLDEAcQ0cDQwRDgEAURxBAHEeDA4BQFEMDgwdDgEAgUCRcD","Dw8LEw8LEOETDwcRwOHBEA8GEcTgEg8DEcXgwOARDwER4MDQxRDgEg8Q4MbQwOMRDhDB0cDQwNHA4sERDRDA0eAQwNHA4sDRwBANEeDC0MLi0sARCxPA0MLQ49HCEAoRwOAQ0eHR48HSEAkR0MEQwOLQwuLC0BEIEMDRw+HC0MHgwNLAEAgQxhDgEMDSwODA0cEQCBHQ4cHgEOAQwdDB4cIRCRHhwOAQ5MAQ4RQLFuDw5hIPEuD04PDhwOARDhDg8+Ly4cEQDRHz4RDg8xDBEAwR0MDx4RHh0OER4BAMEODQ4PDgFMDR4RIMEeMQAhDj8REMEODx4RACEeHy4BAMEOQQAxHg8DDhEQgTwuARBBDiweAQBxHGEAUSwxAHEMDTwhAFEdDA0MEQBxHgEMAUBRDgwNDCEAgUCRcD","Dw8JEg8LEeATDwgQ4MARwBAPBhLEEg8EEODHEg8BEcDQxeITDRHI48DgEgsQwdLB0cDi0sERChDA0RDgENLiwNTAEggRwBDF4sDVwOAQCRHg0MHgwePC08AQChDA0MDgwNHjwOHB0cAQChLA4MDR5RLRwBAIE8HhwNDA5RHhEQcRwOHB4RDR5RLgEgUR0MDQwuEQ4xDgEsDQwhAFEMDQwuDA4BDmEtLBEAUQw+AT4fLiwBDA0sAQBRDgwNASABHg9OHBEMHgEQUUARHg9OEQwhMMEeDy5RMPEODQwPDhEOQSDxDgwOIR4MHjEA8Q4PHhEsDQ4xIMEfLhEAAR4vDgwREIE+Ew4PARARLhwxAHEeDAEcDgwOAQBBLDEAcQxxEEEeDCEQcRMMDRwhAFENHA0MAQCRHQweDA4BAFEODAENDgEAoXBRYE","Dw8KFg8IEOER4BAPBxHB4MEQDwYRxRIPBBDH4BMPEsFgxeISDRDD0MDSwOPBEgsQwNHA4MDR5tDBEQoQwNDG5cDRwBEJEsHQwdLA5MMQChDA0RDgwNPlwNDAEAoU4MDSwOMRwNDAEAYYwNHB5BDhwBEGEMDRwOAQwtLAEOTAEOEQBhDA0cDgwNTAEOXA4MEQBhDA0cDgwNHA0MDlEODC4BAGEMDRwOHC5xLhEQYY6cESDRHk8+HA0MAQDRHm8+AQwRAMEdDA8eIQ4PDg8OATDBDgwOMT4NHw4RELEeDx4REBEODA0PLgEQoQ4PHg8OAQAhHi8uARBBXh8OERAxHh8eDA4BEDEMPgwuEQBRHiwdDAEAMQwDDFEgYTwxADEeDQwNDCEAgR4MPgEAQT4MHgEAgQwNHCEQcVCBDgEMDg0BEPBxYD","Dw8PAxIPCxHgEw8HEeDA4BDAEA8GEeDEEQ8DEscRDwIQ4MkQDhXRwNDA0cETCxHA0MAR0MDi0cHiEAsQwNDCEsBg0MHQwOHAEQAVAxDEEMHQwtDA4cDREAAQwNDBFsDiweDB0uLSEAAQ4MHRwODy48DjwNHA0MDgwNDAEAAQwtDB4PLA0ODw48DRwdHDEAAQwNDD4PLA0ODy4cHQ4MHQwODA0BAAEdDA4BHm8+TA0eHREAEb4fTjEeHREAwS4vLjEsEQDhPg8uAQ4BAAEw8BEODy4BIPBhHz4BAPCBDg8eEQDwgR4dEQDwgR4PDhEA8IEODy4BAPCBDg8eEQDwgQ4PIRDwcRwhEPCBDgwxIPBhDB0MDQwRAPBhLA0MIQDwgWBQ==","Dw8PCBIPCxHAEQ8KEMBQ0BAPBxTREA8EE+AVDwQQ4cHQwRIOFsHQxRAJFcHQwNDA4sTgEAcS4RDgwNPA4cEQ0cESBhDgwNHA4MDRweHQwtHBEMAQBhDA0BDA0OAQ4RDhxeIQ0BAGEMEQwRTgwNLA4sDgEMAQBhPAE+LT4sDREgkSABDhEMDS48DQwRELE+LA0MDjwNLAEAkS4vDmEOAQwdEQCRDh8+Dx5BLA0RAIEdDA8uDy5BLhwBAIEOHw5PLgEeAQwuARBxHx4RLg8uASwtERBxDh8eAQABDg8ODw4BAAEsHQwBAEE+DA4PDgEAAQ4NHhEQEQwxADEcXgEQARwNDiEQAR4MARAxDA08ERAhDi8eAQARMEEsQQAxHh8eARCxPAEQQR4PDgwRAOEgYSwhAPBxHgwxAPBxDQwtARDwcQ4MHQwBAPCBYI"]
+// ---------------------------------------------------------------------
+// decode RLE -> 32x32 grid of palette indices, and back
+// ---------------------------------------------------------------------
+function decode(q){var g=[],bin=atob(q),i=0;for(var y=0;y<32;y++){g.push(new Array(32).fill(0))}
+  for(var m=0;m<bin.length;m++){var b=bin.charCodeAt(m),n=(b&15)+1,k=b>>4;
+    for(var e=0;e<n;e++,i++)if(k)g[i>>5][i&31]=k}return g}
+function encode(g){var out=[],prev=-1,run=0;
+  function flush(){while(run>0){var r=Math.min(16,run);out.push((prev<<4)|(r-1));run-=r}}
+  for(var i=0;i<1024;i++){var v=g[i>>5][i&31];if(v===prev&&run<16*4){run++}else{flush();prev=v;run=1}}
+  flush();return btoa(String.fromCharCode.apply(null,out))}
+function toCanvas(g){var z=document.createElement('canvas'),x=z.getContext('2d');z.width=z.height=32;
+  for(var y=0;y<32;y++)for(var xx=0;xx<32;xx++)if(g[y][xx]){x.fillStyle=P[g[y][xx]];x.fillRect(xx,y,1,1)}return z}
+
+// ---------------------------------------------------------------------
+// the passing frame generator
+// src: grid of walk frame A. hip: first leg row. k: shift at the feet.
+// lift: 1 to raise the torso one pixel and add one leg row.
+// ---------------------------------------------------------------------
+function legGap(g,row){var L=-1,R=-1,seen=0;
+  for(var x=0;x<32;x++){var v=g[row][x];if(v&&!seen){seen=1}
+    if(seen&&!v&&L<0)L=x-1;if(L>=0&&v&&R<0){R=x;break}}
+  return {L:L,R:R}}
+function passing(src,hip,k,lift){
+  var out=[],y;for(y=0;y<32;y++)out.push(new Array(32).fill(0));
+  var gap=legGap(src,30),mid=(gap.L+gap.R)/2;
+  function pinched(row){var r=new Array(32).fill(0),s=Math.round(k*(row-hip)/(31-hip)),x,nx;
+    for(x=0;x<32;x++)if(src[row][x]&&x<mid){nx=x+s;if(nx>=0&&nx<32)r[nx]=src[row][x]}     // back leg first
+    for(x=0;x<32;x++)if(src[row][x]&&x>=mid){nx=x-s;if(nx>=0&&nx<32)r[nx]=src[row][x]}    // front leg on top
+    return r}
+  if(lift){
+    for(y=0;y<hip-1;y++)out[y]=src[y+1].slice();
+    out[hip-1]=pinched(hip);
+  }else{
+    for(y=0;y<hip;y++)out[y]=src[y].slice();
+  }
+  for(y=hip;y<32;y++)out[y]=pinched(y);
+  return out;
+}
+
+// ---------------------------------------------------------------------
+// build the three variants for both characters
+// ---------------------------------------------------------------------
+var CH=[{name:'UNICORN',base:0,hip:20},{name:'WOLF',base:6,hip:21}];
+var VAR=[{name:'CLOSE',extra:0,lift:1},{name:'FLAT',extra:0,lift:0},{name:'STACK',extra:3,lift:1}];
+var G=D.map(decode),S=G.map(toCanvas),PF=[],lines=[];
+CH.forEach(function(ch,ci){
+  var A=G[ch.base+2],gap=legGap(A,30),kClose=Math.ceil((gap.R-gap.L-1)/2);
+  PF[ci]=VAR.map(function(v){
+    var g=passing(A,ch.hip,kClose+v.extra,v.lift),q=encode(g);
+    return {grid:g,cv:toCanvas(g),rle:q,bytes:Math.round(q.length*3/4)};
+  });
+  lines.push(ch.name+': feet gap '+(gap.R-gap.L-1)+'px at row 30, close shift '+kClose+'px');
+  PF[ci].forEach(function(p,vi){lines.push('  '+(vi+1)+' '+VAR[vi].name+'  '+p.bytes+' B  '+p.rle)});
+});
+document.getElementById('out').textContent=lines.join('\n');
+
+// ---------------------------------------------------------------------
+// lab UI
+// ---------------------------------------------------------------------
+var sel=0,mode=0,speeds=[80,100,125],spi=1,run=1,t0=0,acc=0,last=0;
+function ui(){
+  for(var i=0;i<3;i++)document.getElementById('v'+(i+1)).className=sel===i?'on':'';
+  document.getElementById('mode').textContent=(mode?'ANIM':'FRAMES')+' [F]';
+  document.getElementById('spd').textContent='SPEED '+speeds[spi]+'ms [S]';
+  document.getElementById('pz').className=run?'':'on';
+  document.getElementById('info').textContent='variant '+(sel+1)+' '+VAR[sel].name+'  |  cycle A > P > B > P, one frame every '+speeds[spi]+' ms  |  ground line drawn under each sprite';
+}
+for(var i=0;i<3;i++)(function(i){document.getElementById('v'+(i+1)).onclick=function(){sel=i;ui()}})(i);
+document.getElementById('mode').onclick=function(){mode^=1;ui()};
+document.getElementById('spd').onclick=function(){spi=(spi+1)%3;ui()};
+document.getElementById('pz').onclick=function(){run^=1;ui()};
+document.addEventListener('keydown',function(e){var k=(e.key||'').toLowerCase();
+  if(k==='1'||k==='2'||k==='3'){sel=+k-1;ui()}
+  if(k==='f'){mode^=1;ui()}if(k==='s'){spi=(spi+1)%3;ui()}
+  if(k===' '){e.preventDefault();run^=1;ui()}
+  if(k==='arrowright'&&!run){acc+=speeds[spi]}});
+
+function blit(img,x,y,sc){C.drawImage(img,x,y,32*sc,32*sc)}
+function label(t,x,y,col){C.fillStyle=col||'#9aa';C.font='8px monospace';C.fillText(t,x,y)}
+function draw(ts){
+  if(run)acc+=(last?ts-last:0);last=ts;
+  var step=Math.floor(acc/speeds[spi]);
+  C.fillStyle='#03030a';C.fillRect(0,0,320,200);
+  if(!mode){
+    // 4 columns: current 2-frame walk, then the 3 variants as 4-frame cycles
+    var cols=['NOW (2 FR)','1 CLOSE','2 FLAT','3 STACK'];
+    CH.forEach(function(ch,ci){
+      var y=18+ci*92;
+      label(ch.name,8,y-4,'#0ff');
+      for(var col=0;col<4;col++){
+        var x=8+col*78,img;
+        if(col===0){img=S[ch.base+2+(step%2)]}
+        else{var seq=[S[ch.base+2],PF[ci][col-1].cv,S[ch.base+3],PF[ci][col-1].cv];img=seq[step%4]}
+        C.fillStyle=col===0?'#1a1a2e':(sel===col-1?'#243':'#141428');C.fillRect(x-4,y-2,72,70);
+        C.fillStyle='#3a3a5a';C.fillRect(x-4,y+64,72,2);        // ground
+        blit(img,x,y,2);
+        label(cols[col],x-2,y+76,col===0?'#f45':(sel===col-1?'#ffda23':'#9aa'));
+      }
+    });
+  }else{
+    // the three frames of the selected variant at 3x
+    CH.forEach(function(ch,ci){
+      var y=4+ci*100,fr=[S[ch.base+2],PF[ci][sel].cv,S[ch.base+3]],names=['A  (NOW)','P  ('+VAR[sel].name+')','B  (NOW)'];
+      for(var i=0;i<3;i++){var x=14+i*102;
+        C.fillStyle=i===1?'#243':'#141428';C.fillRect(x-4,y,104,98);
+        C.fillStyle='#3a3a5a';C.fillRect(x-4,y+96,104,2);
+        blit(fr[i],x,y,3);label(names[i],x,y+8,i===1?'#ffda23':'#9aa')}
+      label(ch.name,6,y+94,'#0ff');
+    });
+  }
+  C.globalAlpha=.08;C.fillStyle='#fff';for(var yy=0;yy<200;yy+=2)C.fillRect(0,yy,320,1);C.globalAlpha=1;
+  requestAnimationFrame(draw);
+}
+ui();requestAnimationFrame(draw);
+</script>
+</body>
+</html>
