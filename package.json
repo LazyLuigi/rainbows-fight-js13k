@@ -13,7 +13,8 @@
     "preview": "node tools/serve.mjs dist/js13k",
     "preview:wavedash": "node tools/serve.mjs dist/wavedash",
     "clean": "node -e \"const f=require('fs');['dist','.build','rainbow-fight.zip'].forEach(p=>f.rmSync(p,{recursive:true,force:true}))\"",
-    "autoplay": "node tools/autoplay.mjs"
+    "test:wavedash": "node tools/wavedash-test.mjs",
+    "test": "npm run check && npm run test:wavedash"
   },
   "devDependencies": {
     "roadroller": "^2.1.0",

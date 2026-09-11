@@ -1,0 +1,15 @@
+{
+  "achievements": [
+    {"identifier":"FIRST_KO","display_name":"First KO","description":"Knock out your first wolf.","stat_requirement":null},
+    {"identifier":"GARDENER","display_name":"Gardener","description":"Make your first trash can bloom.","stat_requirement":null},
+    {"identifier":"SMASH","display_name":"Smash","description":"Land three hits in a row.","stat_requirement":null},
+    {"identifier":"RAINBOW","display_name":"Rainbow","description":"Fire a fully charged rainbow beam.","stat_requirement":null},
+    {"identifier":"RETURN_TO_SENDER","display_name":"Return to Sender","description":"Volley a thrown trash can straight back.","stat_requirement":null},
+    {"identifier":"DOUBLE_RAINBOW","display_name":"Double Rainbow","description":"Hit two wolves with a single beam.","stat_requirement":null},
+    {"identifier":"CLEAN_SWEEP","display_name":"Clean Sweep","description":"Clean your first street.","stat_requirement":null},
+    {"identifier":"UNTOUCHABLE","display_name":"Untouchable","description":"Clean a street without losing a life.","stat_requirement":null},
+    {"identifier":"BLOCK_PARTY","display_name":"Block Party","description":"Reach street 5.","stat_requirement":null},
+    {"identifier":"TOP_CLEANER","display_name":"Top Cleaner","description":"Score more than 10,000 points in one run.","stat_requirement":null}
+  ],
+  "stats": []
+}

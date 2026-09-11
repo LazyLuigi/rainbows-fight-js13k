@@ -20,6 +20,7 @@ import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { join, resolve } from 'node:path';
 import { minify } from 'terser';
 import { Packer } from 'roadroller';
+import TERSER from './terser-options.mjs';
 
 const LIMIT = 13312;                       // 13 * 1024, the competition budget
 const SRC = 'src/index.html';
@@ -36,13 +37,7 @@ if (!js) { console.error('No <script> block found in ' + SRC); process.exit(1); 
 const css = ((html.match(/<style>([\s\S]*?)<\/style>/) || [])[1] || '').trim();
 
 // ---- 2. terser -----------------------------------------------------------
-// No booleans_as_integers: the Wavedash SDK validates argument types and would
-// silently reject a `1` where it expects `true`.
-const min = await minify(js, {
-  compress: { passes: 3, unsafe: true },
-  mangle: { toplevel: true },
-  format: { comments: false }
-});
+const min = await minify(js, TERSER);
 if (min.error) throw min.error;
 console.log('terser     :', Buffer.byteLength(min.code), 'bytes');
 

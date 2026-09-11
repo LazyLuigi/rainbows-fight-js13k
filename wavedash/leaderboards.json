@@ -1,0 +1,6 @@
+{
+  "description": "Local specification for the portal; the Wavedash CLI has no leaderboard import.",
+  "leaderboards": [
+    {"name":"high-score","display_name":"High Score","sort_order":1,"display_type":0,"keep_best":true,"eligibility":"Any run, sent at game over.","value":"Final score; highest wins."}
+  ]
+}

@@ -77,38 +77,46 @@ other than the canvas `#c`.
 ### Checks
 
 ```bash
-npm run check        # node --check on the script block
-npm run autoplay     # headless bot that plays a run in jsdom and prints the score
+npm test             # syntax check, then the Wavedash integration test
 npm run preview      # serves dist/js13k on http://localhost:8013
 ```
-
-The bot accepts a skill level: `SK=0.5 npm run autoplay`. `SK=1` plays cleanly,
-`SK=0.25` panics. It is what calibrated the default leaderboard.
-
-Before submission the packed page was also loaded in Chromium and Firefox with
-Playwright to confirm that no console error and no external request occur, that
-the extracted ZIP is identical to `dist/js13k/index.html`, and that the page still
-starts in a few seconds with the CPU throttled eight times, which matters because
-the contest site runs its own Chromium check on every uploaded archive.
 
 ## Wavedash
 
 The game also targets the Wavedash challenge. The platform injects its SDK before
-the page's own script, so the game never downloads anything: it calls
-`Wavedash.init()` only when the global exists, and behaves identically everywhere
-else. This is the one call the platform requires to reveal the game.
+the page's own script, so the game never downloads anything: every call is made
+only when the global exists, behind its own guard, and the game behaves
+identically everywhere else.
+
+The integration has ten trophies and one leaderboard, `high-score`, sent at game
+over. The definitions live in [achievements.json](wavedash/achievements.json) and
+[leaderboards.json](wavedash/leaderboards.json). A trophy also shows a banner
+drawn by the game itself, so it is visible on js13kgames.com too; several
+trophies earned in the same second queue up, two seconds each.
+
+Trophies wait for `requestStats()` to answer before being sent, because the SDK
+ignores `setAchievement()` until then, and they are only sent once per session.
+`npm run test:wavedash` runs the game against a strict fake SDK that validates
+argument types and counts calls, on the source and on the terser output the
+build ships, with missing, throwing and rejecting methods. It replaces nothing:
+only a run inside `wavedash dev` proves the round trip to the platform.
 
 [wavedash.toml](wavedash.toml) holds the game identifier and points the upload at
-`dist/wavedash`, the unminified copy of the source. The `wavedash/` folder holds
-the store page material.
+`dist/wavedash`, the unminified copy of the source. The `wavedash/` folder also
+holds the trailer for the store page.
 
-## Capture
+## Submission media
 
-The gameplay GIF and the trailer are not screen recordings. `tools/gif-driver.js`
-is an autopilot that plays the game from its globals, and the capture harness
-replaces `Math.random` with a seeded generator and drives `requestAnimationFrame`
-at a fixed step. The same seed gives the same run, frame for frame, so a capture
-can be redone after a change without comparing two different games.
+- `media/cover.png`: 800 x 500 PNG cover.
+- `media/thumbnail.png`: 320 x 320 PNG adapted from the cover.
+- `media/gameplay.gif`: gameplay preview used above.
+- `media/screenshots/`: five game screenshots.
+- `wavedash/trailer.mp4`: 12 seconds of gameplay, H.264, 1280 x 720, 25 fps,
+  without audio.
+
+Build outputs, prototypes, capture/calibration tools and local reports are ignored
+by Git. The repository keeps the readable source, build and preview tools,
+Wavedash integration tests, platform definitions and submission media.
 
 ## Technical notes
 
@@ -121,10 +129,6 @@ can be redone after a change without comparing two different games.
 - The local leaderboard lives in `localStorage` under the key `rf13`, as
   `NAME<score>,NAME<score>,...`. Reads and writes are wrapped in `try/catch`: in a
   sandboxed iframe the access throws and the game keeps an in-memory board.
-
-The `labs/` folder holds the test benches used during development (sprites and
-animations, walk cycle, music, combat prototype, gameplay with a debug HUD). They
-are not part of the game and open directly in a browser.
 
 ## License
 
